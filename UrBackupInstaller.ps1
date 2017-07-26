@@ -94,6 +94,7 @@ function download_file($action, $outputfn, $params)
 	}
 	return 1
 }
+
 $payload = @{username = $server_username} | ConvertTo-Json
 $salt = get_json 'salt' $payload
 if(-Not ('ses' -in $salt)){
@@ -102,4 +103,28 @@ if(-Not ('ses' -in $salt)){
 }
 Write-Host "We have a user"
 $session = $salt["ses"]	
-	
+
+if($salt -contains "salt"){
+    $md5 = new-object -TypeName System.Security.Cryptography.MD5CryptoServiceProvider
+    $utf8 = new-object -TypeName System.Text.UTF8Encoding
+    $toEncode = $salt["salt"] + $server_password
+    $password_md5_bin = [System.BitConverter]::ToString($md5.ComputeHash($utf8.GetBytes($toEncode)))
+    $enc = [system.Text.Encoding]::UTF8
+    $password_md5 = $enc.GetBytes([Convert]::ToString($password_md5_bin, 16))
+
+    if($salt -contains "pbkdf2_rounds"){
+        $pbkdf2_rounds = [convert]::ToInt32($salt["pbkdf2_rounds"], 10)
+
+        if($pbkdf2_rounds -gt 0){
+            $hmacsha = New-Object System.Security.Cryptography.HMACSHA256
+            $hmacsha.key = [Text.Encoding]::ASCII.GetBytes([convert]::ToInt32($salt["salt"], 10))
+            $password_md5 = $hmacsha.ComputeHash([Text.Encoding]::ASCII.GetBytes($password_md5_bin))
+        }
+        $password_md5 = [System.BitConverter]::ToString($md5.ComputeHash($utf8.GetBytes($salt["rnd"] + $password_md5)))
+
+        $payload = @{"username" = server_username,"password" = $password_md5 } | ConvertTo-Json
+        $login = get_json "login" $payload
+
+    }
+
+}
