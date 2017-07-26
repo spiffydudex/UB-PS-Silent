@@ -100,12 +100,6 @@ if(-Not ('ses' -in $salt)){
 	Write-Host "Username Does Not Exist"
 	exit
 }
-$session = $salt["ses"]
-
-
-
-
-
-
-	
+Write-Host "We have a user"
+$session = $salt["ses"]	
 	
