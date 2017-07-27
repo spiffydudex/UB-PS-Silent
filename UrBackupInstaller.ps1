@@ -124,7 +124,43 @@ if($salt -contains "salt"){
 
         $payload = @{"username" = server_username,"password" = $password_md5 } | ConvertTo-Json
         $login = get_json "login" $payload
+        if ((!($login -contains 'success')) or (!($login['success']))){
+            Write-Host "Error during login. Password Wrong?"
+            exit
+        }
+        $clientname = $env:computername
+        Write-Host "Creating Client " + $clientname + "..."
 
+        $payload = @{"clientname":$clientname} | ConvertTo-Json
+        $new_client = get_json "add_client" $payload
+        if ($new_client -contains "already_exists"){
+            $status = get_json "status"
+            if($status -contains "client_downloads"){
+              ForEach ($client in $status["client_downloads"]){
+                if ($client["name"] -eq $clientname){
+                    Write-Host "Downloading Installer..."
+                    $payload = @{"clientid": client["id"] } | ConvertTo-Json
+                    $downloads_status = download_file "download_client" "UrBackupUpdate.exe" $payload
+                    if(!($downloads_status){
+                        Write-Host "Download of client failed."
+                        exit
+                    }
+                }
+              }
+            }
+            else{
+                Write-Host "Client already exists and login user has probably no right to access existing clients"
+                exit
+            }
+        }
+        else{
+            if (!($new_client -contains "new_authkey")){
+                Write-Host "Error creating new client"
+                exit
+            }
+            write-host "Downloading Installer..."
+
+        }
     }
 
 }
