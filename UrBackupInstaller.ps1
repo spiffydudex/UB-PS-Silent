@@ -122,16 +122,16 @@ if($salt -contains "salt"){
         }
         $password_md5 = [System.BitConverter]::ToString($md5.ComputeHash($utf8.GetBytes($salt["rnd"] + $password_md5)))
 
-        $payload = @{"username" = server_username,"password" = $password_md5 } | ConvertTo-Json
+        $payload = @{"username" = $server_username; "password" = $password_md5 } | ConvertTo-Json
         $login = get_json "login" $payload
-        if ((!($login -contains 'success')) or (!($login['success']))){
+        if ((!($login -contains 'success')) -or (!($login['success']))){
             Write-Host "Error during login. Password Wrong?"
             exit
         }
         $clientname = $env:computername
         Write-Host "Creating Client " + $clientname + "..."
 
-        $payload = @{"clientname":$clientname} | ConvertTo-Json
+        $payload = @{"clientname" = $clientname} | ConvertTo-Json
         $new_client = get_json "add_client" $payload
         if ($new_client -contains "already_exists"){
             $status = get_json "status"
@@ -139,9 +139,9 @@ if($salt -contains "salt"){
               ForEach ($client in $status["client_downloads"]){
                 if ($client["name"] -eq $clientname){
                     Write-Host "Downloading Installer..."
-                    $payload = @{"clientid": client["id"] } | ConvertTo-Json
+                    $payload = @{"clientid" = $client["id"] } | ConvertTo-Json
                     $downloads_status = download_file "download_client" "UrBackupUpdate.exe" $payload
-                    if(!($downloads_status){
+                    if(!($downloads_status)){
                         Write-Host "Download of client failed."
                         exit
                     }
