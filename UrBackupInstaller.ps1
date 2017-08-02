@@ -29,6 +29,12 @@ $global:headers.add("Accept", 'application/json')
 $global:headers.add("Content-Type", 'application/json; charset=UTF-8')
 
 
+#############################
+# Function get_response
+# Purpose: Compile a payload and pass information to the server.
+# Retreive info from server and return.
+# If parameter $download is set, Write an output file.
+#############################
 Function get_response($action, $params, $method, $download)
 {
 	
@@ -74,6 +80,13 @@ Function get_response($action, $params, $method, $download)
 	return $response
 }
 
+#############################
+# Function get_json
+# Pass info to the get_response function.
+# if there is a bad response from the server return Nothing
+# Return the content as string joining on new-line
+#############################
+
 Function get_json($action, $params = @{})
 {
 	$response = get_response $action $params "Post" ''
@@ -86,6 +99,13 @@ Function get_json($action, $params = @{})
 	return (Get-Content $data -join "`n" | ConvertFrom-Json)
 }
 
+#############################
+# Function download_file
+# output file from the server response
+# This function may be unneeded in Powershell
+# 
+#############################
+
 function download_file($action, $outputfn, $params)
 {
 	$response = get_response $action $params 'GET' $outputfn
@@ -94,6 +114,13 @@ function download_file($action, $outputfn, $params)
 	}
 	return 1
 }
+
+
+#############################
+# Main Program Start
+#
+# 
+#############################
 
 $payload = @{username = $server_username} | ConvertTo-Json
 $salt = get_json 'salt' $payload
@@ -159,7 +186,9 @@ if($salt -contains "salt"){
                 exit
             }
             write-host "Downloading Installer..."
-
+            #############################
+            # Remaining functions yet to be written
+            #############################
         }
     }
 
