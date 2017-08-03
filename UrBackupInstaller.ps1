@@ -68,12 +68,11 @@ Function get_response($action, $params, $method, $download)
 
     if($download)
 	{
-        
-		$response = Invoke-RestMethod -Uri $target -Method $method -Body $body -Headers $global:headers -Outfile $download
+		$response = Invoke-RestMethod -Uri $target.AbsoluteUri -Method $method -Body $body -Headers $global:headers -Outfile $download
 	}
 	else
 	{
-        $response = Invoke-RestMethod -Uri $target -Method $method -Body $body -Headers $global:headers 	
+        $response = Invoke-RestMethod -Uri $target.AbsoluteUri -Method $method -Body $body -Headers $global:headers 	
 	}
 	
 	
@@ -90,13 +89,7 @@ Function get_response($action, $params, $method, $download)
 Function get_json($action, $params = @{})
 {
 	$response = get_response $action $params "Post" ''
-	$httpStatusCode = $response.StatusCode.value_
-	if($httpStatusCode -ne 200)
-	{
-		return ""
-	}
-	$data = $response.Content
-	return (Get-Content $data -join "`n" | ConvertFrom-Json)
+	return $response
 }
 
 #############################
@@ -122,34 +115,37 @@ function download_file($action, $outputfn, $params)
 # 
 #############################
 
-$payload = @{username = $server_username} | ConvertTo-Json
+$payload = @{username=$server_username}
 $salt = get_json 'salt' $payload
-if(-Not ('ses' -in $salt)){
+if($salt.ses -ne ""){
 	Write-Host "Username Does Not Exist"
 	exit
 }
 Write-Host "We have a user"
-$session = $salt["ses"]	
+$session = $salt.ses	
 
-if($salt -contains "salt"){
+if($salt.salt -ne ""){
     $md5 = new-object -TypeName System.Security.Cryptography.MD5CryptoServiceProvider
     $utf8 = new-object -TypeName System.Text.UTF8Encoding
-    $toEncode = $salt["salt"] + $server_password
+    $toEncode = $salt.salt + $server_password
     $password_md5_bin = [System.BitConverter]::ToString($md5.ComputeHash($utf8.GetBytes($toEncode)))
     $enc = [system.Text.Encoding]::UTF8
     $password_md5 = $enc.GetBytes([Convert]::ToString($password_md5_bin, 16))
 
-    if($salt -contains "pbkdf2_rounds"){
-        $pbkdf2_rounds = [convert]::ToInt32($salt["pbkdf2_rounds"], 10)
+    if($salt.pbkdf2_rounds -ne ""){
+        $pbkdf2_rounds = [convert]::ToInt32($salt.pbkdf2_rounds, 10)
 
         if($pbkdf2_rounds -gt 0){
             $hmacsha = New-Object System.Security.Cryptography.HMACSHA256
-            $hmacsha.key = [Text.Encoding]::ASCII.GetBytes([convert]::ToInt32($salt["salt"], 10))
+            $hmacsha.key = [Text.Encoding]::ASCII.GetBytes([convert]::ToInt32($salt.salt, 10))
             $password_md5 = $hmacsha.ComputeHash([Text.Encoding]::ASCII.GetBytes($password_md5_bin))
         }
-        $password_md5 = [System.BitConverter]::ToString($md5.ComputeHash($utf8.GetBytes($salt["rnd"] + $password_md5)))
+        $password_md5 = [System.BitConverter]::ToString($md5.ComputeHash($utf8.GetBytes($salt.rnd + $password_md5)))
 
-        $payload = @{"username" = $server_username; "password" = $password_md5 } | ConvertTo-Json
+        $payload = @{
+            username=$server_username
+            password=$password_md5
+        }
         $login = get_json "login" $payload
         if ((!($login -contains 'success')) -or (!($login['success']))){
             Write-Host "Error during login. Password Wrong?"
@@ -158,7 +154,7 @@ if($salt -contains "salt"){
         $clientname = $env:computername
         Write-Host "Creating Client " + $clientname + "..."
 
-        $payload = @{"clientname" = $clientname} | ConvertTo-Json
+        $payload = @{clientname= $clientname}
         $new_client = get_json "add_client" $payload
         if ($new_client -contains "already_exists"){
             $status = get_json "status"
@@ -166,7 +162,7 @@ if($salt -contains "salt"){
               ForEach ($client in $status["client_downloads"]){
                 if ($client["name"] -eq $clientname){
                     Write-Host "Downloading Installer..."
-                    $payload = @{"clientid" = $client["id"] } | ConvertTo-Json
+                    $payload = @{clientid=$client["id"]}
                     $downloads_status = download_file "download_client" "UrBackupUpdate.exe" $payload
                     if(!($downloads_status)){
                         Write-Host "Download of client failed."
